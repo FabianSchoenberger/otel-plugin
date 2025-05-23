@@ -14,10 +14,13 @@ class PluginRegistrar : CompilerPluginRegistrar() {
     override val supportsK2: Boolean = true
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
-        if (configuration[KEY_ENABLED] == false) return
+        val enabled = configuration[KEY_ENABLED] ?: true
         val debug = configuration[KEY_DEBUG] ?: false
         val host = configuration[KEY_HOST]
         val service = configuration[KEY_SERVICE]
+
+        if (!enabled) return
+
         val extension = Extension(debug, host, service)
         IrGenerationExtension.registerExtension(extension)
     }

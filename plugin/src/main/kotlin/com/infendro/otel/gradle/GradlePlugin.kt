@@ -21,12 +21,8 @@ class GradlePlugin : KotlinCompilerPluginSupportPlugin {
     override fun applyToCompilation(
         kotlinCompilation: KotlinCompilation<*>
     ): Provider<List<SubpluginOption>> {
-        return kotlinCompilation.target.project.provider {
-            listOf(
-                SubpluginOption("enabled", "true"),
-                SubpluginOption("debug", "false")
-            )
-        }
+        // TODO apply from build file
+        return kotlinCompilation.target.project.provider { listOf() }
     }
 
     override fun getCompilerPluginId(): String = "otel-plugin"
