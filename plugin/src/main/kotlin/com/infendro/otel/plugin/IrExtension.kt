@@ -30,7 +30,7 @@ import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 
-class Extension(
+class IrExtension(
     val debug: Boolean,
     val host: String?,
     val service: String?,

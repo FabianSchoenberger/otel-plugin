@@ -21,7 +21,7 @@ class PluginRegistrar : CompilerPluginRegistrar() {
 
         if (!enabled) return
 
-        val extension = Extension(debug, host, service)
+        val extension = IrExtension(debug, host, service)
         IrGenerationExtension.registerExtension(extension)
     }
 }
