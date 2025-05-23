@@ -14,3 +14,7 @@ actual fun await(
         process.exit()
     }
 }
+
+actual fun env(name: String): String? {
+    return process.env[name]
+}

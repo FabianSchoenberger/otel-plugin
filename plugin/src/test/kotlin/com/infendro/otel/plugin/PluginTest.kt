@@ -2,8 +2,8 @@ package com.infendro.otel.plugin
 
 import com.tschuchort.compiletesting.JvmCompilationResult
 import com.tschuchort.compiletesting.KotlinCompilation
+import com.tschuchort.compiletesting.PluginOption
 import com.tschuchort.compiletesting.SourceFile
-import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -97,21 +97,44 @@ class PluginTest {
 
     @OptIn(ExperimentalCompilerApi::class)
     fun compile(
-        sourceFiles: List<SourceFile>,
-        compilerPluginRegistrar: CompilerPluginRegistrar = PluginRegistrar(),
+        sourceFiles: List<SourceFile>
     ): JvmCompilationResult {
+        val registrar = PluginRegistrar()
+        val processor = CommandLineProcessor()
         return KotlinCompilation().apply {
             sources = sourceFiles
-            compilerPluginRegistrars = listOf(compilerPluginRegistrar)
+            compilerPluginRegistrars = listOf(registrar)
+            commandLineProcessors = listOf(processor)
+            pluginOptions = listOf(
+                PluginOption(
+                    pluginId = "otel-plugin",
+                    optionName = "enabled",
+                    optionValue = "true"
+                ),
+                PluginOption(
+                    pluginId = "otel-plugin",
+                    optionName = "debug",
+                    optionValue = "true"
+                ),
+                PluginOption(
+                    pluginId = "otel-plugin",
+                    optionName = "host",
+                    optionValue = "localhost:4318"
+                ),
+                PluginOption(
+                    pluginId = "otel-plugin",
+                    optionName = "service",
+                    optionValue = "TEST_OPTION"
+                ),
+            )
             inheritClassPath = true
         }.compile()
     }
 
     @OptIn(ExperimentalCompilerApi::class)
     fun compile(
-        sourceFile: SourceFile,
-        compilerPluginRegistrar: CompilerPluginRegistrar = PluginRegistrar(),
-    ) = compile(listOf(sourceFile), compilerPluginRegistrar)
+        sourceFile: SourceFile
+    ) = compile(listOf(sourceFile))
 }
 
 @OptIn(ExperimentalCompilerApi::class)

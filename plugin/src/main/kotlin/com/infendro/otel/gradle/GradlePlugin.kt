@@ -23,7 +23,8 @@ class GradlePlugin : KotlinCompilerPluginSupportPlugin {
     ): Provider<List<SubpluginOption>> {
         return kotlinCompilation.target.project.provider {
             listOf(
-                SubpluginOption("enabled", "true")
+                SubpluginOption("enabled", "true"),
+                SubpluginOption("debug", "false")
             )
         }
     }

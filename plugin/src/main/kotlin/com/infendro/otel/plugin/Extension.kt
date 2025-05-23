@@ -30,7 +30,11 @@ import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 
-class Extension() : IrGenerationExtension {
+class Extension(
+    val debug: Boolean,
+    val host: String?,
+    val service: String?,
+) : IrGenerationExtension {
     @OptIn(UnsafeDuringIrConstructionAPI::class)
     override fun generate(
         moduleFragment: IrModuleFragment,
@@ -170,7 +174,8 @@ class Extension() : IrGenerationExtension {
         ) = call(function.symbol, block)
 
         fun callConstructor(
-            constructor: IrConstructorSymbol
+            constructor: IrConstructorSymbol,
+            block: IrConstructorCall.() -> Unit = {}
         ): IrConstructorCall {
             return DeclarationIrBuilder(
                 pluginContext,
@@ -178,14 +183,22 @@ class Extension() : IrGenerationExtension {
             ).irCallConstructor(
                 constructor,
                 listOf()
-            )
+            ).apply(block)
         }
 
         fun callConstructor(
-            constructor: IrConstructor
-        ) = callConstructor(constructor.symbol)
+            constructor: IrConstructor,
+            block: IrConstructorCall.() -> Unit = {}
+        ) = callConstructor(constructor.symbol, block)
 
         fun IrCall.argument(
+            index: Int,
+            value: IrExpression?
+        ) {
+            putValueArgument(index, value)
+        }
+
+        fun IrConstructorCall.argument(
             index: Int,
             value: IrExpression?
         ) {
@@ -272,17 +285,111 @@ class Extension() : IrGenerationExtension {
         }
 
         val await = getFunction("com.infendro.otel.util", "await")
+        val env = getFunction("com.infendro.otel.util", "env")
         // endregion
 
         // region fields
-        // val exporter = OtlpExporter()
+        val host = if (host != null) {
+            // val host = <host>
+            buildField(
+                name = "_host",
+                type = string,
+                static = true,
+            ) {
+                initializer = expression {
+                    irString(host)
+                }
+            }
+        } else {
+            // val hostEnv = env("OTLP_HOST")
+            val hostEnv = buildField(
+                name = "_hostEnv",
+                type = string,
+                static = true,
+            ) {
+                initializer = expression {
+                    call(env) {
+                        argument(0, irString("OTLP_HOST"))
+                    }
+                }
+            }
+
+            // val host = if(hostEnv != null) hostEnv else "localhost:4318"
+            buildField(
+                name = "_host",
+                type = string,
+                static = true,
+            ) {
+                initializer = expression {
+                    irIfThenElse(
+                        type = string,
+                        condition = irNotEquals(
+                            irGetField(null, hostEnv),
+                            irNull()
+                        ),
+                        thenPart = irGetField(null, hostEnv),
+                        elsePart = irString("localhost:4318")
+                    )
+                }
+            }
+        }
+
+        val service = if (service != null) {
+            // val service = <service>
+            buildField(
+                name = "_service",
+                type = string,
+                static = true,
+            ) {
+                initializer = expression {
+                    irString(service)
+                }
+            }
+        } else {
+            // val serviceEnv = env("OTLP_SERVICE")
+            val serviceEnv = buildField(
+                name = "_serviceEnv",
+                type = string,
+                static = true,
+            ) {
+                initializer = expression {
+                    call(env) {
+                        argument(0, irString("OTLP_SERVICE"))
+                    }
+                }
+            }
+
+            // val service = if(serviceEnv != null) serviceEnv else ""
+            buildField(
+                name = "_service",
+                type = string,
+                static = true,
+            ) {
+                initializer = expression {
+                    irIfThenElse(
+                        type = string,
+                        condition = irNotEquals(
+                            irGetField(null, serviceEnv),
+                            irNull()
+                        ),
+                        thenPart = irGetField(null, serviceEnv),
+                        elsePart = irString("")
+                    )
+                }
+            }
+        }
+
+        // val exporter = OtlpExporter(host, service)
         val exporter = buildField(
             name = "_exporter",
             type = Exporter.type(),
             static = true,
         ) {
             initializer = expression {
-                callConstructor(Exporter_constructor)
+                callConstructor(Exporter_constructor) {
+                    argument(0, irGetField(null, host))
+                    argument(1, irGetField(null, service))
+                }
             }
         }
 
@@ -336,14 +443,7 @@ class Extension() : IrGenerationExtension {
             }
         }
 
-        firstFile.addChildren(
-            listOf(
-                exporter,
-                processor,
-                provider,
-                tracer
-            )
-        )
+        firstFile.addChildren(fields)
         // endregion
 
         // region functions
@@ -437,12 +537,7 @@ class Extension() : IrGenerationExtension {
             }
         }
 
-        firstFile.addChildren(
-            listOf(
-                startSpan,
-                endSpan,
-            )
-        )
+        firstFile.addChildren(functions)
         // endregion
 
         fun IrFunction.modify() {
@@ -501,7 +596,7 @@ class Extension() : IrGenerationExtension {
                     override fun visitFunctionNew(declaration: IrFunction): IrStatement {
                         fun shouldModify(): Boolean {
                             val invalidOrigins = listOf<IrDeclarationOrigin>(
-                                IrDeclarationOrigin.ADAPTER_FOR_CALLABLE_REFERENCE,
+                                IrDeclarationOrigin.ADAPTER_FOR_CALLABLE_REFERENCE, // function references using :: operator
                             )
 
                             return declaration !in functions &&                     // is not a generated function
@@ -511,17 +606,17 @@ class Extension() : IrGenerationExtension {
                                 declaration.origin !in invalidOrigins
                         }
 
-                        if (!shouldModify()) return declaration
-
-                        declaration.modify()
+                        if (shouldModify()) declaration.modify()
                         return super.visitFunctionNew(declaration)
                     }
                 },
                 null
             )
 
-            println("---${file.name}---")
-            println(file.dump())
+            if (debug) {
+                println("---${file.name}---")
+                println(file.dump())
+            }
         }
         // endregion
     }

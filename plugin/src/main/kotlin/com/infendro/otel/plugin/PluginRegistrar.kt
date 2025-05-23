@@ -1,6 +1,9 @@
 package com.infendro.otel.plugin
 
+import com.infendro.otel.plugin.ConfigurationKeys.KEY_DEBUG
 import com.infendro.otel.plugin.ConfigurationKeys.KEY_ENABLED
+import com.infendro.otel.plugin.ConfigurationKeys.KEY_HOST
+import com.infendro.otel.plugin.ConfigurationKeys.KEY_SERVICE
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
@@ -12,6 +15,10 @@ class PluginRegistrar : CompilerPluginRegistrar() {
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
         if (configuration[KEY_ENABLED] == false) return
-        IrGenerationExtension.registerExtension(Extension())
+        val debug = configuration[KEY_DEBUG] ?: false
+        val host = configuration[KEY_HOST]
+        val service = configuration[KEY_SERVICE]
+        val extension = Extension(debug, host, service)
+        IrGenerationExtension.registerExtension(extension)
     }
 }

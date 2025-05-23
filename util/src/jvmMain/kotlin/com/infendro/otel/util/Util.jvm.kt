@@ -8,3 +8,7 @@ actual fun await(
 ) = runBlocking {
     exporter.await()
 }
+
+actual fun env(name: String): String? {
+    return System.getenv(name)
+}
