@@ -599,11 +599,15 @@ class Extension(
                                 IrDeclarationOrigin.ADAPTER_FOR_CALLABLE_REFERENCE, // function references using :: operator
                             )
 
-                            return declaration !in functions &&                     // is not a generated function
-                                declaration.body != null &&                         // has a body
-                                declaration.name.toString() != "<init>" &&          // is not a constructor
-                                declaration.name.toString() != "<anonymous>" &&     // is not an anonymous function
-                                declaration.origin !in invalidOrigins
+                            val name = declaration.name.toString()
+                            val body = declaration.body
+                            val origin = declaration.origin
+                            return declaration !in functions &&    // is not a generated function
+                                !name.startsWith("_") &&    // is not an ignored function
+                                body != null &&                    // has a body
+                                name != "<init>" &&                // is not a constructor
+                                name != "<anonymous>" &&           // is not an anonymous function
+                                origin !in invalidOrigins
                         }
 
                         if (shouldModify()) declaration.modify()
