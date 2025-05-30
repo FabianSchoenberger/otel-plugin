@@ -21,14 +21,16 @@ import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.defaultType
+import org.jetbrains.kotlin.ir.types.makeNullable
 import org.jetbrains.kotlin.ir.util.addChildren
-import org.jetbrains.kotlin.ir.util.constructors
 import org.jetbrains.kotlin.ir.util.dump
+import org.jetbrains.kotlin.ir.util.getPropertyGetter
 import org.jetbrains.kotlin.ir.util.statements
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.platform.jvm.JvmPlatform
 
 class IrExtension(
     val debug: Boolean,
@@ -40,6 +42,8 @@ class IrExtension(
         moduleFragment: IrModuleFragment,
         pluginContext: IrPluginContext
     ) {
+        val platform = pluginContext.platform!!.single()
+
         val firstFile = moduleFragment.files[0]
 
         // region helpers
@@ -82,6 +86,15 @@ class IrExtension(
             return owner.declarations
                 .filterIsInstance<IrClass>()
                 .single { it.name.toString() == name }
+                .symbol
+        }
+
+        fun IrClassSymbol.getConstructor(
+            filter: (IrConstructor) -> Boolean = { it.isPrimary }
+        ): IrConstructorSymbol {
+            return owner.declarations
+                .filterIsInstance<IrConstructor>()
+                .single(filter)
                 .symbol
         }
 
@@ -173,7 +186,7 @@ class IrExtension(
             block: IrCall.() -> Unit = {}
         ) = call(function.symbol, block)
 
-        fun callConstructor(
+        fun call(
             constructor: IrConstructorSymbol,
             block: IrConstructorCall.() -> Unit = {}
         ): IrConstructorCall {
@@ -186,10 +199,10 @@ class IrExtension(
             ).apply(block)
         }
 
-        fun callConstructor(
+        fun call(
             constructor: IrConstructor,
             block: IrConstructorCall.() -> Unit = {}
-        ) = callConstructor(constructor.symbol, block)
+        ) = call(constructor.symbol, block)
 
         fun IrCall.argument(
             index: Int,
@@ -204,13 +217,47 @@ class IrExtension(
         ) {
             putValueArgument(index, value)
         }
+
+        fun IrFunction.isMain() = name.toString() == "main"
         // endregion
 
         // region
+        val println = getFunction("kotlin.io", "println") {
+            it.valueParameters.size == 1
+                && it.valueParameters[0].type == any.makeNullable()
+        }
+
+        val StringBuilder = when (platform) {
+            is JvmPlatform -> getClass("java.lang", "StringBuilder")
+            else -> getClass("kotlin.text", "StringBuilder")
+        }
+        val StringBuilder_constructor = StringBuilder.getConstructor {
+            it.valueParameters.isEmpty()
+        }
+        val StringBuilder_appendString = StringBuilder.getFunction("append") {
+            it.valueParameters.size == 1
+                && it.valueParameters[0].type == string.makeNullable()
+        }
+        val StringBuilder_appendLong = StringBuilder.getFunction("append") {
+            it.valueParameters.size == 1
+                && it.valueParameters[0].type == long
+        }
+        val StringBuilder_toString = StringBuilder.getFunction("toString")
+
+        val Duration = getClass(
+            "kotlin.time",
+            "Duration"
+        )
+        val Duration_inWholeMilliseconds = Duration.getPropertyGetter("inWholeMilliseconds")!!
+
         val Instant = getClass(
             "kotlinx.datetime",
             "Instant"
         )
+        val Instant_minus = Instant.getFunction("minus") {
+            it.valueParameters.size == 1
+                && it.valueParameters[0].type == Instant.type()
+        }
 
         val Clock = getClass(
             "kotlinx.datetime",
@@ -220,7 +267,7 @@ class IrExtension(
         val now = System.getFunction("now")
 
         val Exporter = getClass("com.infendro.otlp", "OtlpExporter")
-        val Exporter_constructor = Exporter.constructors.single { it.owner.isPrimary }
+        val Exporter_constructor = Exporter.getConstructor()
 
         val Processor = getClass(
             "io.opentelemetry.kotlin.sdk.trace.export",
@@ -228,7 +275,7 @@ class IrExtension(
         )
         val Processor_shutdown = Processor.getFunction("shutdown")
         val ProcessorCompanion = Processor.getClass("Companion")
-        val Processor_builder = ProcessorCompanion.getFunction("builder")
+        val ProcessorCompanion_builder = ProcessorCompanion.getFunction("builder")
 
         val ProcessorBuilder = getClass(
             "io.opentelemetry.kotlin.sdk.trace.export",
@@ -240,9 +287,9 @@ class IrExtension(
             "io.opentelemetry.kotlin.sdk.trace",
             "SdkTracerProvider"
         )
-        val TracerProvider_tracerBuilderFunction = TracerProvider.getFunction("tracerBuilder")
+        val TracerProvider_tracerBuilder = TracerProvider.getFunction("tracerBuilder")
         val TracerProviderCompanion = TracerProvider.getClass("Companion")
-        val TracerProvider_builder = TracerProviderCompanion.getFunction("builder")
+        val TracerProviderCompanion_builder = TracerProviderCompanion.getFunction("builder")
 
         val TracerProviderBuilder = getClass(
             "io.opentelemetry.kotlin.sdk.trace",
@@ -270,7 +317,7 @@ class IrExtension(
         }
         val Context_makeCurrent = Context.getFunction("makeCurrent")
         val ContextCompanion = Context.getClass("Companion")
-        val Context_current = ContextCompanion.getFunction("current")
+        val ContextCompanion_current = ContextCompanion.getFunction("current")
 
         val SpanBuilder = getClass("io.opentelemetry.kotlin.api.trace", "SpanBuilder")
         val SpanBuilder_setParent = SpanBuilder.getFunction("setParent")
@@ -284,7 +331,15 @@ class IrExtension(
             it.valueParameters.size == 1 && it.valueParameters[0].type == Instant.type()
         }
 
-        val await = getFunction("com.infendro.otel.util", "await")
+        val await = getFunction("com.infendro.otel.util", "await") {
+            it.valueParameters.size == 1
+                && it.valueParameters[0].type == Exporter.type()
+        }
+        val await_debug = getFunction("com.infendro.otel.util", "await") {
+            it.valueParameters.size == 2
+                && it.valueParameters[0].type == Exporter.type()
+                && it.valueParameters[1].type == Instant.type()
+        }
         val env = getFunction("com.infendro.otel.util", "env")
         // endregion
 
@@ -386,7 +441,7 @@ class IrExtension(
             static = true,
         ) {
             initializer = expression {
-                callConstructor(Exporter_constructor) {
+                call(Exporter_constructor) {
                     argument(0, irGetField(null, host))
                     argument(1, irGetField(null, service))
                 }
@@ -401,7 +456,7 @@ class IrExtension(
         ) {
             initializer = expression {
                 call(ProcessorBuilder_build) {
-                    dispatchReceiver = call(Processor_builder) {
+                    dispatchReceiver = call(ProcessorCompanion_builder) {
                         dispatchReceiver = irGetObject(ProcessorCompanion)
                         argument(0, irGetField(null, exporter))
                     }
@@ -418,7 +473,7 @@ class IrExtension(
             initializer = expression {
                 call(TracerProviderBuilder_build) {
                     dispatchReceiver = call(TracerProviderBuilder_addSpanProcessor) {
-                        dispatchReceiver = call(TracerProvider_builder) {
+                        dispatchReceiver = call(TracerProviderCompanion_builder) {
                             dispatchReceiver = irGetObject(TracerProviderCompanion)
                         }
                         argument(0, irGetField(null, processor))
@@ -435,7 +490,7 @@ class IrExtension(
         ) {
             initializer = expression {
                 call(TracerBuilder_build) {
-                    dispatchReceiver = call(TracerProvider_tracerBuilderFunction) {
+                    dispatchReceiver = call(TracerProvider_tracerBuilder) {
                         dispatchReceiver = irGetField(null, provider)
                         argument(0, irString(""))
                     }
@@ -542,9 +597,19 @@ class IrExtension(
 
         fun IrFunction.modify() {
             body {
+                var start: IrVariable? = null
+                if (isMain() && debug) {
+                    // val start = Clock.System.now()
+                    start = irTemporary(
+                        call(now) {
+                            dispatchReceiver = irGetObject(System)
+                        }
+                    )
+                }
+
                 // val context = Context.current()
                 val context = irTemporary(
-                    call(Context_current) {
+                    call(ContextCompanion_current) {
                         dispatchReceiver = irGetObject(ContextCompanion)
                     }
                 )
@@ -573,15 +638,70 @@ class IrExtension(
                             argument(1, irGet(context))
                         }
 
-                        if (name.toString() == "main") {
+                        if (isMain()) {
+                            if (debug) {
+                                // val end = Clock.System.now()
+                                val end = irTemporary(
+                                    call(now) {
+                                        dispatchReceiver = irGetObject(System)
+                                    }
+                                )
+
+                                // val ms = (end - start).inWholeMilliseconds
+                                val duration = irTemporary(
+                                    call(Instant_minus) {
+                                        dispatchReceiver = irGet(end)
+                                        argument(0, irGet(start!!))
+                                    }
+                                )
+                                val ms = irTemporary(
+                                    call(Duration_inWholeMilliseconds) {
+                                        dispatchReceiver = irGet(duration)
+                                    }
+                                )
+
+                                // println("Execution finished - $ms ms elapsed")
+                                val builder = irTemporary(
+                                    call(StringBuilder_constructor)
+                                )
+                                +call(StringBuilder_appendString) {
+                                    dispatchReceiver = irGet(builder)
+                                    argument(0, irString("Execution finished - "))
+                                }
+                                +call(StringBuilder_appendLong) {
+                                    dispatchReceiver = irGet(builder)
+                                    argument(0, irGet(ms))
+                                }
+                                +call(StringBuilder_appendString) {
+                                    dispatchReceiver = irGet(builder)
+                                    argument(0, irString(" ms elapsed"))
+                                }
+                                val string = irTemporary(
+                                    call(StringBuilder_toString) {
+                                        dispatchReceiver = irGet(builder)
+                                    }
+                                )
+                                +call(println) {
+                                    argument(0, irGet(string))
+                                }
+                            }
+
                             // processor.shutdown()
                             +call(Processor_shutdown) {
                                 dispatchReceiver = irGetField(null, processor)
                             }
 
-                            // await(exporter)
-                            +call(await) {
-                                argument(0, irGetField(null, exporter))
+                            if (debug) {
+                                // await(exporter, start)
+                                +call(await_debug) {
+                                    argument(0, irGetField(null, exporter))
+                                    argument(1, irGet(start!!))
+                                }
+                            } else {
+                                // await(exporter)
+                                +call(await) {
+                                    argument(0, irGetField(null, exporter))
+                                }
                             }
                         }
                     }
