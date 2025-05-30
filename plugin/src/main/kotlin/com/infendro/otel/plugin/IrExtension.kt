@@ -22,10 +22,7 @@ import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.makeNullable
-import org.jetbrains.kotlin.ir.util.addChildren
-import org.jetbrains.kotlin.ir.util.dump
-import org.jetbrains.kotlin.ir.util.getPropertyGetter
-import org.jetbrains.kotlin.ir.util.statements
+import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
@@ -727,6 +724,8 @@ class IrExtension(
                                 body != null &&                    // has a body
                                 name != "<init>" &&                // is not a constructor
                                 name != "<anonymous>" &&           // is not an anonymous function
+                                !declaration.isGetter &&
+                                !declaration.isSetter &&
                                 origin !in invalidOrigins
                         }
 
