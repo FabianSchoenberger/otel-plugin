@@ -124,7 +124,7 @@ class PluginTest {
                 PluginOption(
                     pluginId = "otel-plugin",
                     optionName = "service",
-                    optionValue = "TEST_OPTION"
+                    optionValue = "TEST"
                 ),
             )
             inheritClassPath = true
