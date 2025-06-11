@@ -278,6 +278,8 @@ class IrExtension(
             "io.opentelemetry.kotlin.sdk.trace.export",
             "BatchSpanProcessorBuilder"
         )
+        val ProcessorBuilder_setMaxQueueSize = Processor.getFunction("setMaxQueueSize")
+        val ProcessorBuilder_setMaxExportBatchSize = Processor.getFunction("setMaxQueueSize")
         val ProcessorBuilder_build = ProcessorBuilder.getFunction("build")
 
         val TracerProvider = getClass(
@@ -445,7 +447,11 @@ class IrExtension(
             }
         }
 
-        // val processor = BatchSpanProcessor.builder(exporter).build()
+        // val processor = BatchSpanProcessor
+        //     .builder(exporter)
+        //     .setMaxQueueSize(Int.MAX_VALUE)
+        //     .setMaxExportBatchSize(2048)
+        //     .build()
         val processor = buildField(
             name = "_processor",
             type = Processor.type(),
@@ -453,9 +459,15 @@ class IrExtension(
         ) {
             initializer = expression {
                 call(ProcessorBuilder_build) {
-                    dispatchReceiver = call(ProcessorCompanion_builder) {
-                        dispatchReceiver = irGetObject(ProcessorCompanion)
-                        argument(0, irGetField(null, exporter))
+                    dispatchReceiver = call(ProcessorBuilder_setMaxExportBatchSize) {
+                        argument(0, irInt(Int.MAX_VALUE))
+                        dispatchReceiver = call(ProcessorBuilder_setMaxQueueSize) {
+                            argument(0, irInt(2048))
+                            dispatchReceiver = call(ProcessorCompanion_builder) {
+                                argument(0, irGetField(null, exporter))
+                                dispatchReceiver = irGetObject(ProcessorCompanion)
+                            }
+                        }
                     }
                 }
             }
