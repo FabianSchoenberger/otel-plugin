@@ -23,7 +23,8 @@ repositories {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-gradle-plugin-api:2.1.10")
+    implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.10")
+    compileOnly("org.jetbrains.kotlin:kotlin-compiler-embeddable")
     implementation(gradleApi())
 
     implementation(kotlin("stdlib"))
@@ -33,8 +34,6 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("com.bennyhuo.kotlin:kotlin-compile-testing-extensions:2.1.0-1.3.0")
-
-    implementation("com.infendro.otel:util:1.0.0")
 }
 
 tasks.test {

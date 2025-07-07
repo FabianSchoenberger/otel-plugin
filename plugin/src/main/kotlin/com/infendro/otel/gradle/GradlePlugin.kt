@@ -2,6 +2,8 @@ package com.infendro.otel.gradle
 
 import org.gradle.api.Project
 import org.gradle.api.provider.Provider
+import org.gradle.kotlin.dsl.getByType
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilerPluginSupportPlugin
 import org.jetbrains.kotlin.gradle.plugin.SubpluginArtifact
@@ -22,10 +24,17 @@ class GradlePlugin : KotlinCompilerPluginSupportPlugin {
     override fun apply(
         target: Project
     ) {
-        target.dependencies.add("implementation", "io.opentelemetry.kotlin.api:all:1.0.570")
-        target.dependencies.add("implementation", "io.opentelemetry.kotlin.sdk:sdk-trace:1.0.570")
-        target.dependencies.add("implementation", "com.infendro.otel:otlp-exporter:1.0.0")
-        target.dependencies.add("implementation", "com.infendro.otel:util:1.0.0")
+        target.plugins.withId("org.jetbrains.kotlin.multiplatform") {
+            val kotlin = target.extensions.getByType<KotlinMultiplatformExtension>()
+            kotlin.sourceSets.apply {
+                getByName("commonMain").dependencies {
+                    implementation("io.opentelemetry.kotlin.api:all:1.0.570")
+                    implementation("io.opentelemetry.kotlin.sdk:sdk-trace:1.0.570")
+                    implementation("com.infendro.otel:otlp-exporter:1.0.0")
+                    implementation("com.infendro.otel:util:1.0.0")
+                }
+            }
+        }
         target.extensions.add("otel", Extension())
         super.apply(target)
     }

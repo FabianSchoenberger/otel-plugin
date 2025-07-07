@@ -278,8 +278,8 @@ class IrExtension(
             "io.opentelemetry.kotlin.sdk.trace.export",
             "BatchSpanProcessorBuilder"
         )
-        val ProcessorBuilder_setMaxQueueSize = Processor.getFunction("setMaxQueueSize")
-        val ProcessorBuilder_setMaxExportBatchSize = Processor.getFunction("setMaxQueueSize")
+        val ProcessorBuilder_setMaxQueueSize = ProcessorBuilder.getFunction("setMaxQueueSize")
+        val ProcessorBuilder_setMaxExportBatchSize = ProcessorBuilder.getFunction("setMaxQueueSize")
         val ProcessorBuilder_build = ProcessorBuilder.getFunction("build")
 
         val TracerProvider = getClass(
