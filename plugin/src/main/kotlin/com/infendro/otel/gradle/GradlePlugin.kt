@@ -22,6 +22,10 @@ class GradlePlugin : KotlinCompilerPluginSupportPlugin {
     override fun apply(
         target: Project
     ) {
+        target.dependencies.add("implementation", "io.opentelemetry.kotlin.api:all:1.0.570")
+        target.dependencies.add("implementation", "io.opentelemetry.kotlin.sdk:sdk-trace:1.0.570")
+        target.dependencies.add("implementation", "com.infendro.otel:otlp-exporter:1.0.0")
+        target.dependencies.add("implementation", "com.infendro.otel:util:1.0.0")
         target.extensions.add("otel", Extension())
         super.apply(target)
     }
