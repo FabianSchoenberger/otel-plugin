@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
 @OptIn(ExperimentalCompilerApi::class)
-class CommandLineProcessor : CommandLineProcessor {
+class Processor : CommandLineProcessor {
     override val pluginId: String = "otel-plugin"
 
     override val pluginOptions: Collection<CliOption> = listOf(

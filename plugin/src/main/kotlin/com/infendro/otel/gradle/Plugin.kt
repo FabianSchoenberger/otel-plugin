@@ -16,7 +16,7 @@ class Extension() {
     var service: String? = null
 }
 
-class GradlePlugin : KotlinCompilerPluginSupportPlugin {
+class Plugin : KotlinCompilerPluginSupportPlugin {
     override fun isApplicable(
         kotlinCompilation: KotlinCompilation<*>
     ): Boolean = true

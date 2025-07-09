@@ -99,8 +99,8 @@ class PluginTest {
     fun compile(
         sourceFiles: List<SourceFile>
     ): JvmCompilationResult {
-        val registrar = PluginRegistrar()
-        val processor = CommandLineProcessor()
+        val registrar = Registrar()
+        val processor = Processor()
         return KotlinCompilation().apply {
             sources = sourceFiles
             compilerPluginRegistrars = listOf(registrar)
