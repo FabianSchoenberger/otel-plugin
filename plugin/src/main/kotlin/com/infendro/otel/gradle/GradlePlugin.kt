@@ -25,18 +25,21 @@ class GradlePlugin : KotlinCompilerPluginSupportPlugin {
         target: Project
     ) {
         target.plugins.withId("org.jetbrains.kotlin.multiplatform") {
-            val kotlin = target.extensions.getByType<KotlinMultiplatformExtension>()
-            kotlin.sourceSets.apply {
-                getByName("commonMain").dependencies {
-                    implementation("io.opentelemetry.kotlin.api:all:1.0.570")
-                    implementation("io.opentelemetry.kotlin.sdk:sdk-trace:1.0.570")
-                    implementation("com.infendro.otel:otlp-exporter:1.0.0")
-                    implementation("com.infendro.otel:util:1.0.0")
-                }
-            }
+            target.extensions
+                .getByType<KotlinMultiplatformExtension>()
+                .addDependencies()
         }
         target.extensions.add("otel", Extension())
         super.apply(target)
+    }
+
+    fun KotlinMultiplatformExtension.addDependencies() {
+        sourceSets.getByName("commonMain").dependencies {
+            implementation("io.opentelemetry.kotlin.api:all:1.0.570")
+            implementation("io.opentelemetry.kotlin.sdk:sdk-trace:1.0.570")
+            implementation("com.infendro.otel:otlp-exporter:1.0.0")
+            implementation("com.infendro.otel:util:1.0.0")
+        }
     }
 
     override fun applyToCompilation(
