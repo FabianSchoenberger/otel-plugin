@@ -3,7 +3,6 @@ package com.infendro.otel.plugin
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
-import org.jetbrains.kotlin.backend.common.lower.DeclarationIrBuilder
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.builders.declarations.IrValueParameterBuilder
@@ -38,28 +37,28 @@ class IrExtension(
     override fun generate(
         moduleFragment: IrModuleFragment,
         pluginContext: IrPluginContext
-    ) {
-        val platform = pluginContext.platform!!.single()
+    ) = with(pluginContext) {
+        val platform = platform!!.single()
 
         val firstFile = moduleFragment.files[0]
 
         // region helpers
-        val unit = pluginContext.irBuiltIns.unitType
-        val any = pluginContext.irBuiltIns.anyType
-        val int = pluginContext.irBuiltIns.intType
-        val long = pluginContext.irBuiltIns.longType
-        val float = pluginContext.irBuiltIns.floatType
-        val double = pluginContext.irBuiltIns.doubleType
-        val boolean = pluginContext.irBuiltIns.booleanType
-        val char = pluginContext.irBuiltIns.charType
-        val string = pluginContext.irBuiltIns.stringType
+        val unit = irBuiltIns.unitType
+        val any = irBuiltIns.anyType
+        val int = irBuiltIns.intType
+        val long = irBuiltIns.longType
+        val float = irBuiltIns.floatType
+        val double = irBuiltIns.doubleType
+        val boolean = irBuiltIns.booleanType
+        val char = irBuiltIns.charType
+        val string = irBuiltIns.stringType
 
         fun getClass(
             packageName: String,
             name: String
         ): IrClassSymbol {
             val classId = ClassId(FqName(packageName), Name.identifier(name))
-            return pluginContext.referenceClass(classId)
+            return referenceClass(classId)
                 ?: throw Exception("class \"${packageName}/${name}\" not found")
         }
 
@@ -69,7 +68,7 @@ class IrExtension(
             filter: (IrFunction) -> Boolean = { true }
         ): IrSimpleFunctionSymbol {
             val callableId = CallableId(FqName(packageName), Name.identifier(name))
-            return pluginContext.referenceFunctions(callableId).singleOrNull { filter(it.owner) }
+            return referenceFunctions(callableId).singleOrNull { filter(it.owner) }
                 ?: throw Exception("function \"${packageName}/${name}\" not found")
         }
 
@@ -115,7 +114,7 @@ class IrExtension(
             static: Boolean = false,
             block: IrField.() -> Unit = {}
         ): IrField {
-            return pluginContext.irFactory
+            return irFactory
                 .buildField {
                     this.name = Name.identifier(name)
                     this.type = type
@@ -131,7 +130,7 @@ class IrExtension(
             returnType: IrType = unit,
             block: IrSimpleFunction.() -> Unit = {}
         ): IrSimpleFunction {
-            return pluginContext.irFactory
+            return irFactory
                 .buildFun {
                     this.name = Name.identifier(name)
                     this.returnType = returnType
@@ -149,24 +148,18 @@ class IrExtension(
         }
 
         fun expression(
-            block: DeclarationIrBuilder.() -> IrExpression
+            block: () -> IrExpression
         ): IrExpressionBody {
-            val builder = DeclarationIrBuilder(
-                pluginContext,
-                firstFile.symbol
-            )
-            return builder.irExprBody(builder.block())
+            return irFactory.createExpressionBody(block())
         }
 
         fun IrFunction.body(
-            block: IrBlockBodyBuilder.() -> Unit
+            block: IrBlockBody.() -> Unit
         ) {
-            body = DeclarationIrBuilder(
-                pluginContext,
-                symbol,
+            body = irFactory.createBlockBody(
                 startOffset,
                 endOffset
-            ).irBlockBody {
+            ) {
                 block()
             }
         }
@@ -187,13 +180,7 @@ class IrExtension(
             constructor: IrConstructorSymbol,
             block: IrConstructorCall.() -> Unit = {}
         ): IrConstructorCall {
-            return DeclarationIrBuilder(
-                pluginContext,
-                firstFile.symbol
-            ).irCallConstructor(
-                constructor,
-                listOf()
-            ).apply(block)
+            return irConstructorCall(constructor).apply(block)
         }
 
         fun call(
