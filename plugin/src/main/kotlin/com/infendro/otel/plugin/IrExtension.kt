@@ -1,8 +1,8 @@
 package com.infendro.otel.plugin
 
-import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
+import org.jetbrains.kotlin.backend.common.lower.DeclarationIrBuilder
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.builders.declarations.IrValueParameterBuilder
@@ -10,8 +10,10 @@ import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
 import org.jetbrains.kotlin.ir.builders.declarations.buildField
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
 import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.expressions.*
-import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
@@ -20,6 +22,7 @@ import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.makeNullable
 import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.visitors.IrTransformer
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
@@ -146,18 +149,17 @@ class IrExtension(
         }
 
         fun expression(
-            block: () -> IrExpression
+            block: IrBuilderWithScope.() -> IrExpression
         ): IrExpressionBody {
-            return irFactory.createExpressionBody(block())
+            val builder = DeclarationIrBuilder(pluginContext, firstFile.symbol)
+            return builder.irExprBody(builder.block())
         }
 
         fun IrFunction.body(
-            block: IrBlockBody.() -> Unit
+            block: IrBlockBodyBuilder.() -> Unit
         ) {
-            body = irFactory.createBlockBody(
-                startOffset,
-                endOffset
-            ) {
+            val builder = DeclarationIrBuilder(pluginContext, symbol)
+            body = builder.irBlockBody {
                 block()
             }
         }
@@ -174,16 +176,14 @@ class IrExtension(
             block: IrCall.() -> Unit = {}
         ) = call(function.symbol, block)
 
-        fun call(
+        fun IrBuilderWithScope.call(
             constructor: IrConstructorSymbol,
             block: IrConstructorCall.() -> Unit = {}
         ): IrConstructorCall {
-            return IrConstructorCallImpl(
-                symbol = constructor
-            ).apply(block)
+            return irCall(constructor).apply(block)
         }
 
-        fun call(
+        fun IrBuilderWithScope.call(
             constructor: IrConstructor,
             block: IrConstructorCall.() -> Unit = {}
         ) = call(constructor.symbol, block)
@@ -708,8 +708,8 @@ class IrExtension(
         // region modify functions
         moduleFragment.files.forEach { file ->
             file.transform(
-                object : IrElementTransformerVoidWithContext() {
-                    override fun visitFunctionNew(declaration: IrFunction): IrStatement {
+                object : IrTransformer<Any?>() {
+                    override fun visitFunction(declaration: IrFunction, data: Any?): IrStatement {
                         fun shouldModify(): Boolean {
                             val invalidOrigins = listOf<IrDeclarationOrigin>(
                                 IrDeclarationOrigin.ADAPTER_FOR_CALLABLE_REFERENCE, // function references using :: operator
@@ -719,7 +719,7 @@ class IrExtension(
                             val body = declaration.body
                             val origin = declaration.origin
                             return declaration !in functions &&    // is not a generated function
-                                !name.startsWith("_") &&    // is not an ignored function
+                                !name.startsWith("_") &&   // is not an ignored function
                                 body != null &&                    // has a body
                                 name != "<init>" &&                // is not a constructor
                                 name != "<anonymous>" &&           // is not an anonymous function
@@ -729,7 +729,7 @@ class IrExtension(
                         }
 
                         if (shouldModify()) declaration.modify()
-                        return super.visitFunctionNew(declaration)
+                        return super.visitFunction(declaration, data)
                     }
                 },
                 null
