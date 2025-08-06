@@ -48,7 +48,7 @@ gradlePlugin {
     plugins {
         create("otel") {
             id = "com.infendro.otel"
-            implementationClass = "com.infendro.otel.gradle.GradlePlugin"
+            implementationClass = "com.infendro.otel.gradle.Plugin"
         }
     }
 }
